@@ -1,134 +1,164 @@
 import * as appTypes from './appTypes';
-import { recomposeColor } from '@mui/material';
-import { template } from 'lodash';
-
 
 const initialState = {
   isLoading: false,
+  error: null,
   job: [],
   jobs: [],
   alljobs: [],
   savejobs: [],
-  myresumes: []
+  myresumes: [],
 };
 
 export default (state = initialState, { type, ...payload }) => {
   switch (type) {
-    // case appTypes.SET_APP_LOADING:
-    //   return { ...state, appLoading: payload.loading }; 
+    /* ===================== JOB LIST ===================== */
 
     case appTypes.FETCH_JOBS_REQUEST:
+    case appTypes.FETCH_ALLJOBS_REQUEST:
+    case appTypes.FETCH_SAVE_JOBS_REQUEST:
+    case appTypes.FETCH_MY_RESUMES_REQUEST:
+    case appTypes.SAVE_JOB_REQUEST:
+    case appTypes.UNSAVE_JOB_REQUEST:
+    case appTypes.CREATE_JOB_REQUEST:
+    case appTypes.PUBLISH_JOB_REQUEST:
       return { ...state, isLoading: true, error: null };
 
     case appTypes.FETCH_JOBS_SUCCESS:
-      return { ...state, isLoading: false, jobs: payload.payload, error: null };
+      return {
+        ...state,
+        isLoading: false,
+        jobs: payload.payload,
+      };
+
+  case appTypes.FETCH_ALLJOBS_SUCCESS:
+  return {
+    ...state,
+    isLoading: false,
+    alljobs: (payload.payload || []).map((job) => ({
+      ...job,
+      id: job.id,          // ✅ UUID from backend
+      saved: false,
+      applied: false,
+    })),
+  };
+
 
     case appTypes.FETCH_JOBS_FAILURE:
-      return { ...state, isLoading: false, error: payload };
-
-    case appTypes.FETCH_ALLJOBS_REQUEST:
-      return { ...state, isLoading: true, error: null };
-
-    case appTypes.FETCH_ALLJOBS_SUCCESS:
-      return { ...state, isLoading: false, alljobs: payload.payload, error: null };
-
     case appTypes.FETCH_ALLJOBS_FAILURE:
-      return { ...state, isLoading: false, error: payload };
-
-    case appTypes.CREATE_JOB_REQUEST:
+    case appTypes.FETCH_SAVE_JOBS_FAILURE:
+    case appTypes.FETCH_MY_RESUMES_FAILURE:
+    case appTypes.SAVE_JOB_FAILURE:
+    case appTypes.UNSAVE_JOB_FAILURE:
+    case appTypes.CREATE_JOB_FAILURE:
+    case appTypes.APPLY_JOB_FAILURE:
+    case appTypes.PUBLISH_JOB_FAILURE:
+    case appTypes.UPLOAD_RESUME_FAILURE:
       return {
-        ...state, isLoading: true, error: null,
+        ...state,
+        isLoading: false,
+        error: payload,
       };
+
+    /* ===================== CREATE / PUBLISH ===================== */
+
     case appTypes.CREATE_JOB_SUCCESS:
       return {
         ...state,
         isLoading: false,
-        job: [...state.job, payload.data],
+        job: [...state.job, payload.payload],
       };
-    case appTypes.CREATE_JOB_FAILURE:
-      return { ...state, isLoading: false, error: payload.error };
 
-    case appTypes.SAVE_JOB_REQUEST:
-      return { ...state, isLoading: true, error: null };
-
-    case appTypes.SAVE_JOB_SUCCESS:
+    case appTypes.PUBLISH_JOB_SUCCESS:
       return {
         ...state,
         isLoading: false,
-        alljobs: state.alljobs.map((job) =>
-          job._id === payload.payload.jobId ? { ...job, saved: true } : job
+        jobs: state.jobs.map((job) =>
+          job.id === payload.payload.id ? payload.payload : job
         ),
       };
 
-    case appTypes.SAVE_JOB_FAILURE:
-      return { ...state, isLoading: false, error: payload };
+    /* ===================== SAVE / UNSAVE JOB ===================== */
+case appTypes.SAVE_JOB_SUCCESS: {
+  const savedJobId = payload.payload?.jobId || payload.payload?._doc?.jobId;
+  const alljobs = state.alljobs.map((job) =>
+    (job._id === savedJobId || job.id === savedJobId) ? { ...job, saved: true } : job
+  );
+  const jobObj = state.alljobs.find((j) => j._id === savedJobId || j.id === savedJobId);
+  const savejobs = jobObj
+    ? [
+        ...state.savejobs.filter((j) => (j._id || j.id) !== savedJobId),
+        { ...jobObj, saved: true, id: jobObj._id || jobObj.id },
+      ]
+    : state.savejobs;
+  return { ...state, isLoading: false, alljobs, savejobs };
+}
 
-    case appTypes.UNSAVE_JOB_REQUEST:
-      return { ...state, isLoading: true, error: null };
 
-    case appTypes.UNSAVE_JOB_SUCCESS:
-      return {
-        ...state,
-        isLoading: false,
-        alljobs: state.alljobs.map((job) =>
-          job._id === payload.payload.jobId ? { ...job, saved: false } : job
-        ),
-      };
+   case appTypes.UNSAVE_JOB_SUCCESS: {
+  const jobId = payload.payload?.jobId;
 
-    case appTypes.UNSAVE_JOB_FAILURE:
-      return { ...state, isLoading: false, error: payload };
+  return {
+    ...state,
+    isLoading: false,
+    alljobs: state.alljobs.map((job) =>
+      job.id === jobId
+        ? { ...job, saved: false }
+        : job
+    ),
+  };
+}
 
-    case appTypes.FETCH_SAVE_JOBS_REQUEST:
-      return { ...state, isLoading: true, error: null };
+
+
+    /* ===================== SAVED JOBS ===================== */
 
     case appTypes.FETCH_SAVE_JOBS_SUCCESS:
-      return { ...state, isLoading: false, savejobs: payload, error: null };
+  return {
+    ...state,
+    isLoading: false,
+    savejobs: (payload.payload || []).map((item) => {
+      const jobObj = item?.jobId || item;
+      return {
+        ...jobObj,
+        id: jobObj?._id || jobObj?.id,
+        saved: true,
+      };
+    }),
+  };
 
-    case appTypes.FETCH_SAVE_JOBS_FAILURE:
-      return { ...state, isLoading: false, error: payload };
-
-    case appTypes.FETCH_MY_RESUMES_REQUEST:
-      return { ...state, isLoading: true, error: null };
+    /* ===================== RESUMES ===================== */
 
     case appTypes.FETCH_MY_RESUMES_SUCCESS:
-      return { ...state, isLoading: false, myresumes: payload.payload, error: null };
-
-    case appTypes.FETCH_MY_RESUMES_FAILURE:
-      return { ...state, isLoading: false, error: payload };
+      return {
+        ...state,
+        isLoading: false,
+        myresumes: payload.payload,
+      };
 
     case appTypes.UPLOAD_RESUME_SUCCESS:
       return {
-        ...state, myresumes: [...state.myresumes, ...(payload.payload || [])],
-        isLoading: false
+        ...state,
+        isLoading: false,
+        myresumes: [...state.myresumes, ...(payload.payload || [])],
       };
 
-    case appTypes.UPLOAD_RESUME_FAILURE:
-      return { ...state, isLoading: false, error: payload };
+    /* ===================== APPLY JOB ===================== */
 
     case appTypes.APPLY_JOB_SUCCESS:
-      return { ...state, isLoading: false };
+      return {
+        ...state,
+        isLoading: false,
+        alljobs: state.alljobs.map((job) =>
+          (job._id === payload.payload.jobId || job.id === payload.payload.jobId)
+            ? { ...job, applied: true }
+            : job
+        ),
+      };
 
-    case appTypes.APPLY_JOB_FAILURE:
-      return { ...state, isLoading: false, error: payload };
+    /* ===================== DEFAULT ===================== */
 
-      case appTypes.PUBLISH_JOB_REQUEST:
-  return { ...state, loading: true };
-
-case appTypes.PUBLISH_JOB_SUCCESS:
-  return {
-    ...state,
-    loading: false,
-    jobs: state.jobs.map((job) =>
-      job._id === payload._id ? payload : job
-    ),
-  };
-
-case appTypes.PUBLISH_JOB_FAILURE:
-  return { ...state, loading: false, error: payload };
-
-  
     default:
       return state;
   }
 };
-

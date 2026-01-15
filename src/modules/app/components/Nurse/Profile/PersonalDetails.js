@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+ import React, { useRef } from 'react';
 import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import { Box, Grid, Avatar, IconButton, Button,alpha, Typography, useMediaQuery } from '@mui/material';
@@ -11,12 +11,14 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { palette,shadows } from 'src/config/theme';
 import ButtonComponent from 'src/components/shared/Button';
+import { updateAccountProfile } from 'src/modules/auth/api/authApi';
+
 
 export const GeneralInformationSchema = Yup.object().shape({
-  fullName: Yup.string().required('Full Name is required'),
-  emailId: Yup.string().email('Invalid email address').required('Email ID is required'),
-  mobileNumber: Yup.string().required('Mobile Number is required'),
-  dateOfBirth: Yup.date().nullable().required('Date of Birth is required'),
+  fullName: Yup.string().optional(),
+  emailId: Yup.string().email('Invalid email address').optional(),
+  mobileNumber: Yup.string().optional(),
+  dateOfBirth: Yup.date().nullable().optional(),
   gender: Yup.string().optional(),
   workStatus: Yup.string().optional(),
   address: Yup.string().optional(),
@@ -26,8 +28,8 @@ export const GeneralInformationSchema = Yup.object().shape({
   professionalBio: Yup.string().optional(),
   photo: Yup.mixed().optional(),
   languages: Yup.array().of(Yup.string()).optional(),
-
 });
+
 
 const initialValues = {
   fullName: '',
@@ -315,21 +317,41 @@ const GeneralInformationFields = () => {
 
 const GeneralInformationForm = () => {
     const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
-  const handleSubmit = (values, { setSubmitting }) => {
-    console.log('Form Submitted (Single Page Save)', values);
-    setTimeout(() => {
-      alert(JSON.stringify(values, null, 2));
-      setSubmitting(false);
-    }, 400);
-  };
+  const handleSubmit = async (values, { setSubmitting }) => {
+  try {
+    const payload = {
+      address: values.address,
+      city: values.city,
+      state: values.state,
+      zipCode: values.zipCode,
+      languages: values.languages,
+    };
+
+    Object.keys(payload).forEach(
+      (key) => payload[key] === '' && delete payload[key]
+    );
+
+    await updateAccountProfile(payload);
+
+    alert('Profile updated successfully!');
+
+  } catch (err) {
+    alert('Something went wrong while saving profile');
+    console.error('API ERROR', err);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
+
 
   return (
     <Formik
-      initialValues={initialValues}
-      validationSchema={GeneralInformationSchema}
-      onSubmit={handleSubmit}
-      enableReinitialize={true}
-    >
+  initialValues={initialValues}
+  // validationSchema={GeneralInformationSchema} ❌ comment
+  onSubmit={handleSubmit}
+>
+
       {({ isSubmitting, isValid, dirty }) => (
         <Form>
           <GeneralInformationFields />

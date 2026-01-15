@@ -39,13 +39,14 @@ import {
 import ButtonComponent from 'src/components/shared/Button';
 import { FooterPart, HeaderPart } from '../../utility/Styles';
 import HighlightOffRoundedIcon from '@mui/icons-material/HighlightOffRounded';
-import { GridFooterContainer } from '@mui/x-data-grid';
+import { useLocation } from 'react-router-dom';
 
 const locationOptions = [
   { label: 'Mumbai', value: 'Mumbai' },
   { label: 'Delhi', value: 'Delhi' },
   { label: 'Bengaluru', value: 'Bengaluru' },
 ];
+
 const nurseTypeOptions = [
   'RN',
   'LPN / LVN',
@@ -67,7 +68,9 @@ export default function JobDashboard({ onOpenJob }) {
   const error = useSelector((state) => state.app?.error);
 
   const [filters, setFilters] = useState({ keyword: '', location: '', nurseType: [] });
-  const [tab, setTab] = useState('applied');
+  const location = useLocation();
+  const initialTab = new URLSearchParams(location.search).get('tab') || 'applied';
+  const [tab, setTab] = useState(initialTab);
 
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
@@ -83,25 +86,41 @@ export default function JobDashboard({ onOpenJob }) {
   });
 
   const allJobs = useSelector((s) => s.app?.alljobs || []);
-  const savedJobs = useSelector((s) => s.app?.savejobs?.payload || []);
+  const savedJobs = useSelector((s) => s.app?.savejobs || []);
 
   useEffect(() => {
-    dispatch(fetchAllJobsRequest());
+  dispatch(fetchAllJobsRequest(filters));
+}, [dispatch, filters]);
+
+useEffect(() => {
+  if (tab === 'saved') {
     dispatch(fetchSaveJobsRequest());
-    dispatch(fetchMyResumesRequest());
-  }, [dispatch]);
+  }
+}, [tab, dispatch]);
+
+
+  const savedTabJobs =
+  savedJobs && savedJobs.length > 0
+    ? savedJobs.map((item) => {
+        const jobObj = item?.jobId; // backend sends jobId object
+        return {
+          ...jobObj,
+          saved: true,
+        };
+      })
+
+      : allJobs
+          .filter((j) => j.saved)
+          .map((j) => ({ ...j, id: j._id || j.id, saved: true }));
 
   const jobs =
-    tab === 'saved'
-      ? savedJobs.map((item) => ({
-          ...item.jobId,
-          id: item.jobId._id,
-          saved: true,
-        }))
-      : allJobs.map((j) => ({
-          ...j,
-          id: j._id || j.id,
-          saved: savedJobs?.some((sj) => sj.jobId?._id === j._id) || j.saved || false,
+  tab === 'saved'
+    ? savedTabJobs
+    : allJobs.map((j) => ({
+        ...j,
+
+         saved: savedJobs?.some((sj) => sj.jobId?.id === j.id) || j.saved || false,
+
           applied: tab === 'applied' ? true : (j.applied || false),
         }));
 
@@ -122,37 +141,44 @@ export default function JobDashboard({ onOpenJob }) {
   }, [jobs, filters]);
 
   const handleSaveToggle = async (job) => {
-    try {
-      if (job.saved) {
-        await new Promise((resolve, reject) =>
-          dispatch(unsaveJobRequest(job._id, resolve, reject)),
-        );
-        enqueueSnackbar('Job removed from saved list', { variant: 'info' });
-      } else {
-        await new Promise((resolve, reject) => dispatch(saveJobRequest(job._id, resolve, reject)));
-        enqueueSnackbar('Job saved successfully!', { variant: 'success' });
-      }
-      dispatch(fetchSaveJobsRequest());
-    } catch (error) {
-      enqueueSnackbar(error?.message || 'Action failed', { variant: 'error' });
+  try {
+    if (!job?.id) {
+      console.error('❌ INVALID JOB ID', job);
+      throw new Error('Invalid job id');
     }
-  };
 
-  const handleApplyClick = (job) => {
-    setSelectedJob(job);
-    setOpenDialog(true);
-    const defaultCoverLetter = `Dear Hiring Manager,
+    console.log('✅ Saving job with ID:', job.id);
 
-I am excited to apply for the ${job.title} position at ${job.hospital}.
-My nursing background and patient-care experience align well with your requirements.
+    if (job.saved) {
+      await new Promise((resolve, reject) =>
+        dispatch(unsaveJobRequest(job.id, resolve, reject))
+      );
+      enqueueSnackbar('Job removed from saved list', { variant: 'info' });
+    } else {
+      await new Promise((resolve, reject) =>
+        
+        dispatch(saveJobRequest(job.id, resolve, reject))
+        
+      
+      );
+      enqueueSnackbar('Job saved successfully!', { variant: 'success' });
+    }
 
-Thank you for considering my application.
+    dispatch(fetchSaveJobsRequest());
+  } catch (error) {
+    enqueueSnackbar(error?.message || 'Action failed', { variant: 'error' });
+  }
+};
 
-Sincerely,
-Nurse
-`;
-
-    setCoverLetter(defaultCoverLetter);
+  const handleApplyClick = async (job) => {
+    try {
+      await new Promise((resolve, reject) =>
+        dispatch(applyJobRequest(job._id || job.id, {}, resolve, reject))
+      );
+      enqueueSnackbar('Applied successfully', { variant: 'success' });
+    } catch (error) {
+      enqueueSnackbar(error?.message || 'Apply failed', { variant: 'error' });
+    }
   };
 
   const handleApplySubmit = async () => {
@@ -161,7 +187,6 @@ Nurse
     try {
       let resumeLink = selectedResume?.path;
 
-      // Only upload if the resume is still new and has a file
       if (selectedResume?.id === 'new' && selectedResume?.file) {
         const formData = new FormData();
         formData.append('resumes', selectedResume.file);
@@ -322,13 +347,14 @@ Nurse
         {loading ? (
           <Typography>Loading jobs...</Typography>
         ) : error ? (
-          <Typography color="error">Error loading jobs</Typography>
+          <Typography color="error">{typeof error === 'string' ? error : (error?.message || 'Error loading jobs')}</Typography>
         ) : filteredJobs.length === 0 ? (
           <Typography>No jobs found</Typography>
         ) : (
           filteredJobs.map((job) => (
             <JobCard
-              key={job.id || job._id}
+              key={job.id}
+
               job={job}
               onSave={() => handleSaveToggle(job)}
               onApply={() => handleApplyClick(job)}

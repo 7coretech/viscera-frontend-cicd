@@ -39,7 +39,7 @@ function RecruiterLogin() {
       setLoading(true);
       dispatch(
         login(
-          values,
+          { ...values, role: "recruiter" },
           (res) => {
             toast.success("Login Successful");
             navigate("/recruiter/dashboard");

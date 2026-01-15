@@ -10,17 +10,23 @@ import { push } from "redux-first-history";
 function* handleLogin({ data, resolve, reject }) {
   try {
     const response = yield call(authApi.loginUser, data);
-    const accessToken = response?.data?.accessToken;
+    const body = response || {};
+    const accessToken = body?.accessToken || body?.data?.accessToken;
+    const role = body?.user?.role || body?.role || data?.role || "nurse";
 
     if (!accessToken) throw new Error("Token missing");
 
     storage.set("TOKEN", accessToken);
-    storage.set("ROLE", "nurse");
+    storage.set("ROLE", role);
 
-    yield put(push("/nurse/dashboard"));
+    if (resolve) resolve(body);
+
+    const target = role === "recruiter" ? "/recruiter/dashboard" : "/nurse/dashboard";
+    yield put(push(target));
   } catch (err) {
     storage.del("TOKEN");
     storage.del("ROLE");
+    if (reject) reject(err);
   }
 }
 
@@ -29,11 +35,12 @@ function* handleLogin({ data, resolve, reject }) {
  */
 function* handleLogout() {
   storage.del("TOKEN");
+  const lastRole = storage.get?.("ROLE");
   storage.del("ROLE");
   storage.del("TENANT_HASH");
 
-  // 🔥 EXACT ROUTE YOU WANT
-  yield put(push("/auth/nurse/login"));
+  const target = lastRole === "recruiter" ? "/auth/recruiter/login" : "/auth/nurse/login";
+  yield put(push(target));
 }
 
 function* watchAuth() {

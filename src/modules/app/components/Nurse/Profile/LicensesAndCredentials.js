@@ -32,6 +32,7 @@ import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
+import { postLicense } from 'src/modules/auth/api/authApi';
 
 const nursingLicenseTypeOptions = [
   { label: 'Registered Nurse (RN)', value: 'RN' },
@@ -342,14 +343,45 @@ const LicensesAndCredentials = () => {
         </HeaderPart>
 
         <Formik
-          initialValues={initialValues}
-          validationSchema={LicenseSchema}
-          onSubmit={(values, { resetForm }) => {
-            setLicenseList([...licenseList, values]);
-            resetForm();
-            setOpen(false);
-          }}
-        >
+  initialValues={initialValues}
+  validationSchema={LicenseSchema}
+onSubmit={async (values, { resetForm }) => {
+  try {
+    const formData = new FormData();
+
+    formData.append('licenseType', values.nursingLicenseType);
+    formData.append('licenseNumber', values.licenseNumber);
+    formData.append('states[]', values.licenseState);
+    formData.append(
+      'isMultiState',
+      values.multiStateLicense === 'Yes' ? 'true' : 'false'
+    );
+    formData.append('expiryDate', values.expiryDate);
+
+    values.specialtyCertifications.forEach(spec => {
+      formData.append('specialties[]', spec);
+    });
+
+    // ✅ MUST MATCH multer.single("license")
+    if (values.credentialUploads) {
+      formData.append('license', values.credentialUploads);
+    }
+
+    await postLicense(formData, true);
+
+    alert('License saved successfully ✅');
+    setLicenseList(prev => [...prev, values]);
+    resetForm();
+    setOpen(false);
+
+  } catch (error) {
+    console.error('License API error:', error);
+    alert(error?.response?.data?.message || 'Failed to save license ❌');
+  }
+}}
+
+>
+
           {({ handleSubmit }) => (
             <Form style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <DialogContent

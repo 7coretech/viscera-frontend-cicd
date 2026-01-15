@@ -27,6 +27,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import ButtonComponent from 'src/components/shared/Button';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
+import { postResume } from 'src/modules/auth/api/authApi';
 
 const ResumeManager = () => {
   const [resumeList, setResumeList] = useState([]);
@@ -45,24 +46,37 @@ const ResumeManager = () => {
     fileInputRef.current.click();
   };
 
-  const handleFileSelect = (event) => {
-    const files = event.target.files;
-    if (files.length > 0) {
-      const fileName = files[0].name;
-      const newResume = {
-        id: Date.now(),
-        fileName: fileName,
-        displayName: fileName.split('.')[0],
-        extension: fileName.split('.').pop(),
-        isPrimary: resumeList.length === 0,
-        categoryLabel: resumeList.length === 0 ? 'Primary Resume' : `Resume ${resumeList.length + 1}`,
-      };
+  const handleFileSelect = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
 
-      setResumeList([...resumeList, newResume]);
-      event.target.value = null;
-      setEditingId(newResume.id);
-    }
-  };
+  try {
+    const formData = new FormData();
+    formData.append('resume', file); // ✅ backend expects "resume"
+
+    // Call your backend API
+    await postResume(formData);
+
+    // Update frontend state
+    const fileName = file.name;
+    const newResume = {
+      id: Date.now(),
+      fileName,
+      displayName: fileName.split('.')[0],
+      extension: fileName.split('.').pop(),
+      isPrimary: resumeList.length === 0,
+      categoryLabel: resumeList.length === 0 ? 'Primary Resume' : `Resume ${resumeList.length + 1}`,
+    };
+
+    setResumeList([...resumeList, newResume]);
+    setEditingId(newResume.id);
+    event.target.value = null;
+  } catch (error) {
+    console.error('Failed to upload resume:', error);
+    alert('Failed to upload resume. Please try again.');
+  }
+};
+
 
   const handleRename = (id, newName) => {
     setResumeList(

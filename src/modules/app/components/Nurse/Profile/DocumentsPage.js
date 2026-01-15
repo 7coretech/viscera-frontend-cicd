@@ -23,6 +23,8 @@ import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import ButtonComponent from 'src/components/shared/Button';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
+import { postDocument } from 'src/modules/auth/api/authApi';
+
 
 const AcceptedFileTypes = () => {
   const theme = useTheme();
@@ -72,23 +74,46 @@ const DocumentsPage = () => {
     fileInputRef.current.click();
   };
 
-  const handleFileSelect = (event) => {
-    const files = event.target.files;
-    if (files.length > 0) {
-      const fileName = files[0].name;
-      const newDocument = {
-        id: Date.now(),
-        fileName: fileName,
-        displayName: fileName.split('.')[0],
-        extension: fileName.split('.').pop(),
-        categoryLabel: documentList.length === 0 ? 'Primary Document' : `Document ${documentList.length + 1}`,
-      };
+  const handleFileSelect = async (event) => {
+  const files = event.target.files;
+  if (!files.length) return;
 
-      setDocumentList([...documentList, newDocument]);
-      event.target.value = null;
-      setEditingId(newDocument.id);
-    }
+  const file = files[0];
+
+  const newDocument = {
+    id: Date.now(),
+    file,
+    fileName: file.name,
+    displayName: file.name.split('.')[0],
+    extension: file.name.split('.').pop(),
+    categoryLabel:
+      documentList.length === 0
+        ? 'Primary Document'
+        : `Document ${documentList.length + 1}`,
   };
+
+  setDocumentList(prev => [...prev, newDocument]);
+  setEditingId(newDocument.id);
+  event.target.value = null;
+
+  // 🔥 UPLOAD IMMEDIATELY
+  try {
+    const formData = new FormData();
+    formData.append('document', file); // MUST match multer
+    formData.append('name', newDocument.displayName);
+    formData.append('category', newDocument.categoryLabel);
+
+    await postDocument(formData);
+
+  } catch (error) {
+    console.error('Document upload failed:', error);
+    alert(
+      error?.response?.data?.message ||
+      'Failed to upload document ❌'
+    );
+  }
+};
+
 
   const handleRename = (id, newName) => {
     setDocumentList(

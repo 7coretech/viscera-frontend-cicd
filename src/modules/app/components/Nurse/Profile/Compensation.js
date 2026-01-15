@@ -22,6 +22,8 @@ import {
 import theme from 'src/config/theme';
 import ButtonComponent from 'src/components/shared/Button';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import { postCompensation } from 'src/modules/auth/api/authApi';
+
 
 const salaryTypeOptions = [
   { label: 'Annual Salary', value: 'Annual Salary' },
@@ -309,13 +311,44 @@ const CompensationFields = () => {
 const Compensation = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const handleSubmit = (values, { setSubmitting }) => {
-    console.log('Compensation Form Submitted', values);
-    setTimeout(() => {
-      alert(JSON.stringify(values, null, 2));
-      setSubmitting(false);
-    }, 400);
-  };
+  const handleSubmit = async (values, { setSubmitting, resetForm }) => {
+  try {
+    const payload = {
+      salaryType: values.salaryType,
+      minimumSalary: Number(values.minimumSalary),
+      maximumSalary: values.maximumSalary
+        ? Number(values.maximumSalary)
+        : null,
+      salaryNegotiable: values.salaryNegotiable,
+      expectedHourlyRate: values.expectedHourlyRate
+        ? Number(values.expectedHourlyRate)
+        : null,
+      expectedWeeklyPay: values.expectedWeeklyPay
+        ? Number(values.expectedWeeklyPay)
+        : null,
+      expectedTravelPackage: values.expectedTravelPackage || null,
+      housingNeeded: values.housingNeeded,
+      stipendRequired: values.stipendRequired,
+      visaAssistanceRequired: values.visaAssistanceRequired,
+      sponsorshipRequired: values.sponsorshipRequired,
+      benefits: values.selectedBenefits,
+    };
+
+    await postCompensation(payload);
+
+    alert('Compensation saved successfully ✅');
+    resetForm();
+
+  } catch (error) {
+    console.error('Compensation API error:', error);
+    alert(
+      error?.response?.data?.message ||
+      'Failed to save compensation ❌'
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   return (
     <Box>

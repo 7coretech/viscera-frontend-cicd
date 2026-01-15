@@ -426,27 +426,47 @@ const ExperienceAndWork = () => {
         <Formik
   initialValues={initialValues}
   validationSchema={ExperienceSchema}
-  onSubmit={async (values, { resetForm }) => {
-    try {
-      await postExperience(values);
+ onSubmit={async (values, { resetForm }) => {
+  try {
+    // 🔥 BACKEND PAYLOAD MAPPING (IMPORTANT)
+    const payload = {
+      startDate: values.startDate,
+      endDate: values.endDate,
+      totalExperience: values.totalYears,
+      specialtyExperience: values.specialtyYears,
+      positionTitle: values.lastPositionTitle,
+      employer: values.lastEmployer,
+      jobType: values.jobType,
+      shiftType: values.shiftType,
+      contractDuration: values.contractDuration,
+      locationType: values.locationType,
+      highAcuity: values.highAcuity,
+    };
 
+    await postExperience(payload);
+
+    // ✅ alert will now always show
+    setTimeout(() => {
       alert('Experience saved successfully ✅');
+    }, 100);
 
-      setExperienceList([...experienceList, values]);
-      resetForm();
-      setOpen(false);
+    // ✅ update UI
+    setExperienceList((prev) => [...prev, values]);
 
-      // OPTIONAL: full page reload
-      // window.location.reload();
+    resetForm();
+    setOpen(false);
+  } catch (error) {
+    console.error('Experience API error', error);
 
-    } catch (error) {
+    setTimeout(() => {
       alert(
         error?.response?.data?.message ||
         'Failed to save experience ❌'
       );
-      console.error('Experience API error', error);
-    }
-  }}
+    }, 100);
+  }
+}}
+
 >
 
           {({ handleSubmit }) => (

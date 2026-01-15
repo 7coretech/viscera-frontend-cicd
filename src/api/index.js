@@ -5,8 +5,15 @@ import storage from 'src/utils/storageUtils';
    AXIOS INSTANCE
 ========================= */
 
+const BASE_URL = process.env.REACT_APP_BASE_API_URL;
+
+if (!BASE_URL) {
+  console.error('❌ REACT_APP_BASE_API_URL is missing');
+}
+
 const client = axios.create({
-  baseURL: process.env.REACT_APP_BASE_API_URL || '',
+  baseURL: BASE_URL,
+  validateStatus: (status) => status >= 200 && status < 400,
 });
 
 /* =========================
@@ -19,17 +26,16 @@ client.interceptors.request.use(
     const tenantHash = storage.get('TENANT_HASH');
     const isFormData = config.data instanceof FormData;
 
-    config.headers = {
-      ...config.headers,
-      ...(isFormData ? {} : { 'Content-Type': 'application/json;charset=utf-8' }),
-    };
+    if (!isFormData) {
+      config.headers['Content-Type'] = 'application/json;charset=utf-8';
+    }
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
     if (tenantHash) {
-      config.headers.Tenant = tenantHash;
+      config.headers['Tenant-Hash'] = tenantHash;
     }
 
     return config;
@@ -38,21 +44,14 @@ client.interceptors.request.use(
 );
 
 /* =========================
-   RESPONSE INTERCEPTOR
+   RESPONSE INTERCEPTOR ✅
 ========================= */
 
 client.interceptors.response.use(
   (response) => response,
   (error) => {
-    const status = error?.response?.status;
-
-    if (status === 403) {
-      storage.del('TOKEN');
-      storage.del('ROLE');
-      storage.del('TENANT_HASH');
-    }
-
-    return Promise.reject(error?.response?.data || error);
+    console.error('API Error:', error?.response || error);
+    return Promise.reject(error);
   }
 );
 
@@ -69,34 +68,25 @@ export default function api(
   responseType = 'json',
   params = {}
 ) {
-  if (params && Object.keys(params).length > 0) {
-    const queryString = new URLSearchParams(params).toString();
-    path = `${path}?${queryString}`;
-  }
-
   return client
     .request({
-      method,
       url: path,
-      data: payload,
+      method,
       responseType,
+      ...(method === 'get'
+        ? { params: payload }
+        : { data: payload }),
       ...(onUploadProgress && { onUploadProgress }),
     })
     .then((response) => response.data);
 }
 
 /* =========================
-   POST TRAVEL DATA
+   EXTRA APIs
 ========================= */
 
-export function postNurseTravel(travelData) {
-  return api('/api/v1/nurses/travel', travelData, 'post');
-}
+export const postNurseTravel = (travelData) =>
+  api('/api/v1/nurses/travel', travelData, 'post');
 
-/* =========================
-   POST AVAILABILITY DATA ✅
-========================= */
-
-export function postNurseAvailability(availabilityData) {
-  return api('/api/v1/nurses/availability', availabilityData, 'post');
-}
+export const postNurseAvailability = (availabilityData) =>
+  api('/api/v1/nurses/availability', availabilityData, 'post');

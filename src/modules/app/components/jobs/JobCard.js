@@ -109,9 +109,7 @@ export default function JobCard({ job, onSave, onApply, onOpen }) {
           size="small"
           sx={{ borderRadius: 2 }}
           onClick={() => {
-            if (!job.applied) {
-              onApply(job);
-            }
+            onApply(job);
           }}
         >
           {job.applied ? 'Applied' : 'Apply Now'}

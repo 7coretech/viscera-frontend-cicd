@@ -1,6 +1,7 @@
 import React from 'react';
+import { useEffect,useState } from 'react';
 import { Box, Typography, Grid, TextField, Divider } from '@mui/material';
-import { Formik, Form } from 'formik';
+import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import InputComponent from 'src/components/shared/Form/Input';
 import InputSelect from 'src/components/shared/Form/Select';
@@ -9,26 +10,106 @@ import { FormLabel } from '../../../utility/Styles';
 import { palette, typography } from 'src/config/theme';
 import { useTheme } from '@emotion/react';
 import useResponsive from 'src/components/hooks/useResponsive';
+import { getRecruiterOrganization, saveRecruiterOrganization } 
+  from 'src/modules/auth/api/authApi';
+
+
+
+const FORM_STORAGE_KEY = 'recruiter_organization_form';
+
+const FormObserver = () => {
+  const { values } = useFormikContext();
+  useEffect(() => {
+    localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(values));
+  }, [values]);
+  return null;
+};
 
 export default function OrganizationForm({ onSubmit }) {
-  const initialValues = {
-    organizationName: '',
-    organizationType: '',
-    subCategory: '',
-    country: '',
-    state: '',
-    city: '',
-    fullAddress: '',
-    website: '',
-    contactEmail: '',
-    contactPhone: '',
-    ownershipType: '',
-    organizationSize: '',
-    description: '',
-    accreditations: '',
-    industrySector: '',
-    serviceCoverage: '',
-  };
+  const [initialValues, setInitialValues] = useState({
+  organizationName: '',
+  organizationType: '',
+  subCategory: '',
+  country: '',
+  state: '',
+  city: '',
+  fullAddress: '',
+  website: '',
+  contactEmail: '',
+  contactPhone: '',
+  ownershipType: '',
+  organizationSize: '',
+  description: '',
+  accreditations: '',
+  industrySector: '',
+  serviceCoverage: '',
+});
+const [loadingOrg, setLoadingOrg] = useState(true);
+
+const fetchOrganization = async () => {
+  try {
+    setLoadingOrg(true);
+
+    const res = await getRecruiterOrganization();
+    const org = res?.data?.data;
+    const location = org?.location?.[0];
+
+    if (res?.success && org) {
+      setInitialValues({
+        organizationName: org.name || '',
+        organizationType: org.type || '',
+        subCategory: org.subCategory || '',
+        country: location?.country || '',
+        state: location?.state || '',
+        city: location?.city || '',
+        fullAddress: location?.addressLine || '',
+        website: org.websiteUrl || '',
+        contactEmail: location?.generalContactEmail || '',
+        contactPhone: location?.generalContactPhone || '',
+        ownershipType: org.ownershipType || '',
+        organizationSize: org.organizationSize || '',
+        description: org.description || '',
+        accreditations: Array.isArray(org.accreditations)
+          ? org.accreditations.join(', ')
+          : '',
+        industrySector: org.industrySector || '',
+        serviceCoverage: location?.serviceCoverageArea?.[0] || '',
+      });
+    }
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoadingOrg(false);
+  }
+};
+
+  useEffect(() => {
+    const savedData = localStorage.getItem(FORM_STORAGE_KEY);
+    if (savedData) {
+      setInitialValues(JSON.parse(savedData));
+      setLoadingOrg(false);
+    } else {
+      fetchOrganization();
+    }
+  }, []);
+  
+ const handleSubmit = async (values, { setSubmitting }) => {
+  try {
+    const res = await saveRecruiterOrganization(values);
+
+    if (res?.success) {
+      localStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(values));
+      setInitialValues(values);
+      alert('Organization submitted successfully ✅');
+    } 
+  } catch (error) {
+    alert('Failed to submit organization ❌');
+    console.error(error);
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   const validationSchema = Yup.object({
     organizationName: Yup.string().required('Organization name is required'),
@@ -114,13 +195,21 @@ export default function OrganizationForm({ onSubmit }) {
           borderRadius: 3,
         }}
       >
-        <Formik
-          initialValues={initialValues}
-          validationSchema={validationSchema}
-          onSubmit={onSubmit}
-        >
+        
+       {loadingOrg ? (
+          <Typography sx={{ p: 3 }}>Loading organization...</Typography>
+        ) : (
+          <Formik
+            enableReinitialize
+            initialValues={initialValues}
+            validationSchema={validationSchema}
+            onSubmit={handleSubmit}
+          >
+
+
           {({ values, errors, touched, handleChange, handleBlur, setFieldValue }) => (
             <Form>
+              <FormObserver />
               <Grid container spacing={2}>
                 {/* ORGANIZATION NAME */}
                 <Grid item xs={12} sm={6}>
@@ -386,6 +475,7 @@ export default function OrganizationForm({ onSubmit }) {
             </Form>
           )}
         </Formik>
+        )}
       </Box>
     </Box>
   );

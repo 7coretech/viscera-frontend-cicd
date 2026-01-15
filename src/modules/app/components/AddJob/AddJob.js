@@ -10,11 +10,24 @@ import ButtonComponent from 'src/components/shared/Button';
 import { palette, shadows, typography } from 'src/config/theme.js';
 import { ReactComponent as AddIcon } from 'src/assets/images/add-square.svg';
 import useResponsive from 'src/components/hooks/useResponsive';
+import { useFormikContext } from 'formik';
+import { useEffect } from 'react';
+import { createJob } from 'src/modules/auth/api/authApi';
+import api from 'src/api';
 
+const PersistJobForm = () => {
+  const { values } = useFormikContext();
+
+  useEffect(() => {
+    localStorage.setItem('jobForm', JSON.stringify(values));
+  }, [values]);
+
+  return null;
+};
 const validationSchema = Yup.object().shape({
   // hospital: Yup.string().required('Enter hospital name'),
   title: Yup.string().required('Enter job title'),
-  location: Yup.string().required('Enter job location'),
+  locationId: Yup.string().required('Select job location'),
   minExp: Yup.number().min(0, 'Min exp cannot be negative').required(),
   maxExp: Yup.number().required(),
   salaryType: Yup.string().required(),
@@ -31,23 +44,44 @@ function RecruiterJobForm() {
   const { isMobile } = useResponsive();
   const navigate = useNavigate();
   const dispatch = useDispatch();
+    const [locations, setLocations] = React.useState([]);
 
-  const handleSubmit = (values, { resetForm, setSubmitting }) => {
-    dispatch(
-      createJobRequest(
-        values,
-        (response) => {
-          console.log('✅ Job Created:', response);
-          resetForm();
-          navigate('/recruiter/sharejob');
-        },
-        (error) => {
-          console.error('❌ Error creating job:', error);
-          setSubmitting(false);
-        },
-      ),
-    );
-  };
+  useEffect(() => {
+  api('/api/v1/recruiters/organization', null, 'get')
+    .then((res) => {
+      if (res.success && res.data && Array.isArray(res.data.locations)) {
+        setLocations(res.data.locations);
+      } else {
+        setLocations([]);
+        console.error('No locations in organization response');
+      }
+    })
+    .catch((err) => {
+      console.error('Failed to load locations', err);
+      setLocations([]);
+    });
+}, []);
+
+
+  
+
+const handleSubmit = (values, { resetForm, setSubmitting }) => {
+  dispatch(
+    createJobRequest(
+      values,
+      (response) => {
+        localStorage.removeItem('jobForm'); // 👈 IMPORTANT
+        resetForm();
+        navigate('/recruiter/sharejob');
+      },
+      (error) => {
+        
+        setSubmitting(false);
+      }
+    )
+  );
+};
+
 
   return (
     <Box
@@ -80,31 +114,44 @@ function RecruiterJobForm() {
           Enter all the details to post a new job.
         </Typography>
 
-        <Formik
-          initialValues={{
-            // hospital: '',
-            title: '',
-            location: '',
-            minExp: '',
-            maxExp: '',
-            salaryType: '',
-            minSalary: '',
-            maxSalary: '',
-            description: '',
-            specialty: '',
-            shiftType: '',
-            employmentType: '',
-            license: '',
-            education: '',
-            contractDuration: '',
-            benefits: '',
-            hospital:'Test'
-          }}
-          validationSchema={validationSchema}
-          onSubmit={handleSubmit}
-        >
-          {({ values, errors, touched, handleChange, handleBlur, isSubmitting }) => (
-            <Form>
+<Formik
+  initialValues={
+  JSON.parse(localStorage.getItem('jobForm')) || {
+    title: '',
+    locationId: '', // ✅ FIX
+    minExp: '',
+    maxExp: '',
+    salaryType: '',
+    minSalary: '',
+    maxSalary: '',
+    description: '',
+    specialty: '',
+    shiftType: '',
+    employmentType: '',
+    license: '',
+    education: '',
+    contractDuration: '',
+    benefits: '',
+    hospital: 'Test',
+  }
+}
+
+  validationSchema={validationSchema}
+  onSubmit={handleSubmit}
+>
+  {({ values, errors, touched, handleChange, handleBlur, isSubmitting }) => (
+        <Form>
+   
+      <PersistJobForm /> {/* ✅ THIS FIXES EVERYTHING */}
+
+ 
+
+
+         
+  
+  
+
+       
               <FormField
                 label="Job Title"
                 name="title"
@@ -116,16 +163,16 @@ function RecruiterJobForm() {
                 handleBlur={handleBlur}
               />
 
-              <FormField
-                label="Job Location"
-                name="location"
-                placeholder="Ex. New York, USA"
-                values={values}
-                errors={errors}
-                touched={touched}
-                handleChange={handleChange}
-                handleBlur={handleBlur}
-              />
+              <SelectField
+  label="Job Location"
+  name="locationId"
+  values={values}
+  handleChange={handleChange}
+  handleBlur={handleBlur}
+  options={locations.map(loc => ({ id: loc.id, label: loc.name }))}
+/>
+
+
 
               <Box
                 sx={{
@@ -286,7 +333,9 @@ function RecruiterJobForm() {
               >
                 {isSubmitting ? 'Saving...' : 'Save Job'}
               </ButtonComponent>
-            </Form>
+              </Form>
+       
+ 
           )}
         </Formik>
       </Box>
@@ -339,12 +388,14 @@ const FormField = ({
 const SelectField = ({ label, name, values, handleChange, handleBlur, options }) => (
   <Box>
     <Typography sx={{ ...typography.smallRegular, mb: 0.5 }}>{label}</Typography>
+
     <Select
       name={name}
       fullWidth
       value={values[name]}
       onChange={handleChange}
       onBlur={handleBlur}
+      displayEmpty
       sx={{
         height: '52px',
         borderRadius: '12px',
@@ -352,13 +403,26 @@ const SelectField = ({ label, name, values, handleChange, handleBlur, options })
         boxShadow: shadows[1],
       }}
     >
-      {options.map((opt) => (
-        <MenuItem key={opt} value={opt}>
-          {opt}
-        </MenuItem>
-      ))}
+      <MenuItem value="">
+        <em>Select {label}</em>
+      </MenuItem>
+
+      {options.map((opt) =>
+        typeof opt === 'string' ? (
+          // ✅ For Specialty, Shift Type, Salary Type, etc.
+          <MenuItem key={opt} value={opt}>
+            {opt}
+          </MenuItem>
+        ) : (
+          // ✅ For Location dropdown (id + label)
+          <MenuItem key={opt.id} value={opt.id}>
+            {opt.label}
+          </MenuItem>
+        )
+      )}
     </Select>
   </Box>
 );
+
 
 export default RecruiterJobForm;

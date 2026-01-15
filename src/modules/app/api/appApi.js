@@ -1,41 +1,43 @@
 import api from 'src/api';
 
-export const getJobs = (data) => {
-  return api('/jobs/my', data, 'get');
+/* ===================== JOBS ===================== */
+
+// Get all jobs
+export const getAllJobs = (params = {}) => {
+  return api('/api/v1/jobs', {}, 'get', false, null, 'json', params);
 };
 
-export const getAllJobs = (filters = {}) => {
-  return api('/jobs/alljobs', {}, 'get', false, null, 'json', filters);
+
+// Get job by ID
+export const getJobById = (jobId) => {
+  return api(`/api/v1/jobs/${jobId}`, {}, 'get');
 };
 
-export const createJob = (data) => {
-  return api("/jobs/add", data, "post");
+
+/* ===================== APPLICANT ===================== */
+
+// Apply job
+export const applyJob = (data) => {
+  return api('/api/v1/applicant/apply', data, 'post');
 };
 
+// Save job
 export const saveJob = (jobId) => {
-  return api(`/save/job/${jobId}`, {}, "post");
+  return api(
+    '/api/v1/applicant/save',
+    { jobId },
+    'post'
+  );
 };
 
-export const unsaveJob = (jobId) => {
-  return api(`/save/remove/${jobId}`, {}, "delete");
+
+
+// Get saved jobs
+export const getSavedJobs = (data = {}) => {
+  return api('/api/v1/applicant/save', { action: 'list', ...data }, 'post');
 };
 
-export const getSavedJobs = (data) => {
-  return api('/save/my-savedjob', data, 'get');
-};
-
-export const getMyResumes = (data) => {
-  return api('/resume/get', data, 'get');
-};
-
-export const uploadResume = (formData) => {
-  return api('/resume/upload', formData, 'post', true); 
-};
-
-export const applyJob = ({ jobId, data }) => {
-  return api(`/jobapplications/${jobId}/apply`, data, 'post');
-};
-
-export const publishJob = ({ jobId }) => {
-  return api(`/jobs/publish/${jobId}`, null, 'patch');
+// Check applied / saved jobs
+export const checkAppliedOrSavedJobs = (data) => {
+  return api('/api/v1/applicant/save', data, 'post');
 };

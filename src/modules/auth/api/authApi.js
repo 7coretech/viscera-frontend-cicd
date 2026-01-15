@@ -36,3 +36,58 @@ export const postAvailability = (data) => {
 export const getCompletionScore = () => {
   return api('/api/v1/nurses/completion-score', {}, 'get');
 };
+
+// UPDATE PROFILE (General Information)
+export const updateAccountProfile = (data) => {
+  return api('/api/v1/account/', data, 'patch');
+};
+
+export const postLicense = (data) => {
+  return api('/api/v1/nurses/licenses', data, 'post', true);
+};
+
+export const postCompensation = (data) => {
+  return api('/api/v1/nurses/compensation', data, 'post');
+};
+
+export const postDocument = (data) => {
+  return api('/api/v1/nurses/documents', data, 'post');
+};
+
+export const postResume = (data) => {
+  return api('/api/v1/nurses/resumes', data, 'post');
+};
+
+
+
+
+/* ===================== ORGANIZATION ===================== */
+
+// GET recruiter organization
+export const getRecruiterOrganization = () => {
+  return api(
+    `/api/v1/recruiters/organization?ts=${Date.now()}`,
+    null,
+    'get'
+  );
+};
+
+
+// POST recruiter organization
+export const saveRecruiterOrganization = (data) => {
+  return api(
+    '/api/v1/recruiters/organization',
+    data,
+    'post',
+    true,
+    null,
+    'json'
+  );
+};
+
+// POST create new job
+export const createJob = (data) => {
+  return api('/api/v1/jobs', data, 'post', true, null, 'json');
+};
+
+

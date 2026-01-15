@@ -1,10 +1,8 @@
-import { reject } from 'lodash';
 import * as appTypes from './appTypes';
+import { createJob } from 'src/modules/auth/api/authApi'; // points to POST /api/v1/jobs
 
-// export const setAppLoading = (loading) => ({
-//   type: appTypes.SET_APP_LOADING,
-//   loading,
-// });
+
+/* ===================== JOB LIST ===================== */
 
 export const fetchJobsRequest = () => ({
   type: appTypes.FETCH_JOBS_REQUEST,
@@ -20,9 +18,13 @@ export const fetchJobsFailure = (error) => ({
   payload: error,
 });
 
-export const fetchAllJobsRequest = (filters = {}) => ({
+/* ===================== ALL JOBS ===================== */
+
+export const fetchAllJobsRequest = (filters = {}, resolve, reject) => ({
   type: appTypes.FETCH_ALLJOBS_REQUEST,
   payload: filters,
+  resolve,
+  reject,
 });
 
 export const fetchAllJobsSuccess = (jobs) => ({
@@ -35,26 +37,45 @@ export const fetchAllJobsFailure = (error) => ({
   payload: error,
 });
 
-export const createJobRequest = (data, resolve, reject) => ({
-  type: appTypes.CREATE_JOB_REQUEST,
-  data,
-  resolve,
-  reject,
-});
+/* ===================== CREATE JOB ===================== */
 
-export const createJobSuccess = (payload) => ({
+/* ===================== CREATE JOB ===================== */
+
+export const createJobRequest = (data, onSuccess, onError) => {
+  return async (dispatch) => {
+    try {
+      const response = await createJob(data);
+
+      if (response?.success) {
+        dispatch(createJobSuccess(response.data));
+        onSuccess && onSuccess(response.data);
+      } else {
+        dispatch(createJobFailure(response?.message || 'Error creating job'));
+        onError && onError(response?.message || 'Error creating job');
+      }
+    } catch (err) {
+      dispatch(createJobFailure(err.message || 'Error creating job'));
+      onError && onError(err.message || 'Error creating job');
+    }
+  };
+};
+
+export const createJobSuccess = (job) => ({
   type: appTypes.CREATE_JOB_SUCCESS,
-  payload,
+  payload: job,
 });
 
 export const createJobFailure = (error) => ({
   type: appTypes.CREATE_JOB_FAILURE,
-  error,
+  payload: error,
 });
+
+
+/* ===================== SAVE / UNSAVE JOB ===================== */
 
 export const saveJobRequest = (jobId, resolve, reject) => ({
   type: appTypes.SAVE_JOB_REQUEST,
-  jobId,
+  payload: { jobId },
   resolve,
   reject,
 });
@@ -71,7 +92,7 @@ export const saveJobFailure = (error) => ({
 
 export const unsaveJobRequest = (jobId, resolve, reject) => ({
   type: appTypes.UNSAVE_JOB_REQUEST,
-  jobId,
+  payload: { jobId },
   resolve,
   reject,
 });
@@ -86,8 +107,12 @@ export const unsaveJobFailure = (error) => ({
   payload: error,
 });
 
-export const fetchSaveJobsRequest = () => ({
+/* ===================== SAVED JOBS ===================== */
+
+export const fetchSaveJobsRequest = (resolve, reject) => ({
   type: appTypes.FETCH_SAVE_JOBS_REQUEST,
+  resolve,
+  reject,
 });
 
 export const fetchSaveJobsSuccess = (jobs) => ({
@@ -100,13 +125,17 @@ export const fetchSaveJobsFailure = (error) => ({
   payload: error,
 });
 
-export const fetchMyResumesRequest = () => ({
+/* ===================== RESUMES ===================== */
+
+export const fetchMyResumesRequest = (resolve, reject) => ({
   type: appTypes.FETCH_MY_RESUMES_REQUEST,
+  resolve,
+  reject,
 });
 
-export const fetchMyResumesSuccess = (jobs) => ({
+export const fetchMyResumesSuccess = (resumes) => ({
   type: appTypes.FETCH_MY_RESUMES_SUCCESS,
-  payload: jobs,
+  payload: resumes,
 });
 
 export const fetchMyResumesFailure = (error) => ({
@@ -131,6 +160,8 @@ export const uploadResumeFailure = (error) => ({
   payload: error,
 });
 
+/* ===================== APPLY JOB ===================== */
+
 export const applyJobRequest = (jobId, data, resolve, reject) => ({
   type: appTypes.APPLY_JOB_REQUEST,
   payload: { jobId, data },
@@ -148,6 +179,8 @@ export const applyJobFailure = (error) => ({
   payload: error,
 });
 
+/* ===================== PUBLISH JOB ===================== */
+
 export const publishJobRequest = (jobId, resolve, reject) => ({
   type: appTypes.PUBLISH_JOB_REQUEST,
   payload: { jobId },
@@ -155,9 +188,9 @@ export const publishJobRequest = (jobId, resolve, reject) => ({
   reject,
 });
 
-export const publishJobSuccess = (response) => ({
+export const publishJobSuccess = (job) => ({
   type: appTypes.PUBLISH_JOB_SUCCESS,
-  payload: response,
+  payload: job,
 });
 
 export const publishJobFailure = (error) => ({

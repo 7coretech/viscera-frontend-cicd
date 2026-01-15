@@ -1,36 +1,46 @@
+name: Deploy Nurses Frontend
+
 on:
   push:
     branches:
-      - master
-name: Deploy website on push
+      - main
 
 jobs:
-  web-deploy:
-    name: Deploy
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Get latest code
-        uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Use Node.js 18
-        uses: actions/setup-node@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: 18
 
-      - name: Build Project
-        run: |
-          npm install --legacy-peer-deps
-          CI=false npm run build
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
 
-      - name: Sync files
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      - name: Build React App
+        run: CI=false npm run build
+
+      - name: Upload build to server
+        uses: appleboy/scp-action@v0.1.7
         with:
-          protocol: ftps              
-          server: 64.227.188.188
-          username: sftp
-          password: sftp
-          local-dir: ./build/
-          server-dir: /viscera/build/
-          port: 21
-          sec-options: "explicittls"                
-          debug: true
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          port: ${{ secrets.SERVER_PORT }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "build/*"
+          target: ${{ secrets.SERVER_PATH }}
+
+      - name: Restart nginx permissions
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          port: ${{ secrets.SERVER_PORT }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            chown -R root:root ${{ secrets.SERVER_PATH }}
+            chmod -R 755 ${{ secrets.SERVER_PATH }}

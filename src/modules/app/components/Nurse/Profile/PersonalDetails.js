@@ -1,4 +1,4 @@
- import React, { useRef } from 'react';
+ import React, { useRef, useEffect, useState } from 'react';
 import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import { Box, Grid, Avatar, IconButton, Button,alpha, Typography, useMediaQuery } from '@mui/material';
@@ -11,7 +11,21 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { palette,shadows } from 'src/config/theme';
 import ButtonComponent from 'src/components/shared/Button';
-import { updateAccountProfile } from 'src/modules/auth/api/authApi';
+import { updateAccountProfile,getAccountProfile } from 'src/modules/auth/api/authApi';
+const FormAutoSave = () => {
+  const { values } = useFormikContext();
+
+  useEffect(() => {
+    localStorage.setItem(
+      FORM_STORAGE_KEY,
+      JSON.stringify({ ...values, photo: null })
+    );
+  }, [values]);
+
+  return null;
+};
+
+
 
 
 export const GeneralInformationSchema = Yup.object().shape({
@@ -30,6 +44,8 @@ export const GeneralInformationSchema = Yup.object().shape({
   languages: Yup.array().of(Yup.string()).optional(),
 });
 
+
+const FORM_STORAGE_KEY = 'nurse_personal_details_form';
 
 const initialValues = {
   fullName: '',
@@ -317,7 +333,67 @@ const GeneralInformationFields = () => {
 
 const GeneralInformationForm = () => {
     const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
-  const handleSubmit = async (values, { setSubmitting }) => {
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [loading, setLoading] = useState(true);
+
+ useEffect(() => {
+  const loadProfile = async () => {
+    try {
+      const response = await getAccountProfile();
+
+      // 🔹 LocalStorage (draft data)
+      const savedData = localStorage.getItem(FORM_STORAGE_KEY);
+      const localData = savedData ? JSON.parse(savedData) : {};
+
+      if (response?.data) {
+        const api = response.data;
+
+        // ✅ MAP API RESPONSE → FORM FIELDS
+        const mappedApiData = {
+          fullName: api.fullName || '',
+          emailId: api.email || '',
+          mobileNumber: api.mobile || '',
+          gender: api.gender || '',
+          workStatus: api.workStatus || '',
+          address: api.address || '',
+          city: api.city || '',
+          state: api.state || '',
+          photo: api.profileImage?.url || null,
+        };
+
+        // ✅ FINAL MERGE ORDER
+        const mergedData = {
+          ...initialValues,  // defaults
+          ...localData,      // unsaved local edits
+          ...mappedApiData,  // API always wins
+        };
+
+        setFormInitialValues(mergedData);
+
+        // ✅ Keep localStorage in sync
+        localStorage.setItem(
+          FORM_STORAGE_KEY,
+          JSON.stringify(mergedData)
+        );
+      }
+    } catch (error) {
+      console.error('GET PROFILE FAILED, loading from localStorage', error);
+
+      const savedData = localStorage.getItem(FORM_STORAGE_KEY);
+      if (savedData) {
+        setFormInitialValues({
+          ...initialValues,
+          ...JSON.parse(savedData),
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  loadProfile();
+}, []);
+const handleSubmit = async (values, { setSubmitting }) => {
   try {
     const payload = {
       address: values.address,
@@ -325,19 +401,33 @@ const GeneralInformationForm = () => {
       state: values.state,
       zipCode: values.zipCode,
       languages: values.languages,
+      gender: values.gender,
+      workStatus: values.workStatus,
+      dateOfBirth: values.dateOfBirth,
+      professionalBio: values.professionalBio,
     };
 
+    // Remove empty fields
     Object.keys(payload).forEach(
-      (key) => payload[key] === '' && delete payload[key]
+      (key) =>
+        (payload[key] === '' ||
+          payload[key] === null ||
+          payload[key]?.length === 0) &&
+        delete payload[key]
     );
 
     await updateAccountProfile(payload);
 
     alert('Profile updated successfully!');
 
-  } catch (err) {
+    // ✅ Sync localStorage after save
+    localStorage.setItem(
+      FORM_STORAGE_KEY,
+      JSON.stringify(values)
+    );
+  } catch (error) {
+    console.error('PROFILE UPDATE FAILED', error);
     alert('Something went wrong while saving profile');
-    console.error('API ERROR', err);
   } finally {
     setSubmitting(false);
   }
@@ -345,33 +435,31 @@ const GeneralInformationForm = () => {
 
 
 
+
+
   return (
     <Formik
-  initialValues={initialValues}
-  // validationSchema={GeneralInformationSchema} ❌ comment
+  enableReinitialize
+  initialValues={formInitialValues}
   onSubmit={handleSubmit}
 >
+  <Form>
+    <FormAutoSave />   {/* ✅ SAFE HOOK USAGE */}
+    <GeneralInformationFields />
 
-      {({ isSubmitting, isValid, dirty }) => (
-        <Form>
-          <GeneralInformationFields />
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
-            <ButtonComponent
-             
-              type="submit"
-              variant="contained"
-              // disabled={isSubmitting || !dirty || !isValid} 
-              // fullWidth
-                fullWidth={isMobileOrBelow}
-                sx={{width:'200px'}}
-            
-            >
-              Save Changes
-            </ButtonComponent>
-          </Box>
-        </Form>
-      )}
-    </Formik>
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+      <ButtonComponent
+        type="submit"
+        variant="contained"
+        fullWidth={isMobileOrBelow}
+        sx={{ width: '200px' }}
+      >
+        Save Changes
+      </ButtonComponent>
+    </Box>
+  </Form>
+</Formik>
+
   );
 };
 

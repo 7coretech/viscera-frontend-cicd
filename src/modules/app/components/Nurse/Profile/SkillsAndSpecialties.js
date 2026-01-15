@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Formik, Form, useFormikContext } from "formik";
 import * as Yup from "yup";
 import {
@@ -18,7 +18,7 @@ import {
 import theme from "src/config/theme";
 import ButtonComponent from "src/components/shared/Button";
 import { postSkills } from 'src/modules/auth/api/authApi';
-
+import { getSkills } from "src/modules/auth/api/authApi";
 
 const clinicalSkillOptions = [
   "ICU",
@@ -184,6 +184,49 @@ const SkillsFields = () => {
 
 const SkillsAndSpecialties = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down("sm"));
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const fetchSkills = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const res = await getSkills();
+        const base =
+          res && typeof res === "object"
+            ? res
+            : {};
+        const data =
+          base && typeof base.data === "object"
+            ? base.data
+            : base;
+        setFormInitialValues({
+          clinicalSkills: Array.isArray(data?.clinical)
+            ? data.clinical
+            : Array.isArray(data?.clinicalSkills)
+            ? data.clinicalSkills
+            : [],
+          technicalSkills: Array.isArray(data?.technical)
+            ? data.technical
+            : Array.isArray(data?.technicalSkills)
+            ? data.technicalSkills
+            : [],
+          softSkills: Array.isArray(data?.soft)
+            ? data.soft
+            : Array.isArray(data?.softSkills)
+            ? data.softSkills
+            : [],
+        });
+      } catch (e) {
+        setError(e?.response?.data?.message || "Failed to load skills");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSkills();
+  }, []);
 
  const handleSubmit = async (values, { setSubmitting, resetForm }) => {
   try {
@@ -207,10 +250,16 @@ const SkillsAndSpecialties = () => {
 
   return (
     <Box>
+      {error && (
+        <Typography sx={{ color: theme.palette.error.main, mb: 2 }}>
+          {error}
+        </Typography>
+      )}
       <Formik
-        initialValues={initialValues}
+        initialValues={formInitialValues}
         validationSchema={SkillsSchema}
         onSubmit={handleSubmit}
+        enableReinitialize={true}
       >
         {() => (
           <Form>
@@ -219,6 +268,7 @@ const SkillsAndSpecialties = () => {
               <ButtonComponent
                 type="submit"
                 variant="contained"
+                disabled={loading}
                 fullWidth={isMobileOrBelow}
                 sx={{ width: isMobileOrBelow ? "100%" : "200px" }}
               >

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState,useEffect} from "react";
 import { Formik, Form, useFormikContext } from "formik";
 import * as Yup from "yup";
 import {
@@ -19,6 +19,20 @@ import InputSelect from "src/components/shared/Form/Select";
 import ButtonComponent from "src/components/shared/Button";
 import { FormHeaderContainer, HeaderText, SubHeader, FormLabel } from "../../../utility/Styles";
 import { postProfilePreferences } from 'src/modules/auth/api/authApi';
+import { getProfilePreferences } from 'src/modules/auth/api/authApi';
+const keyToLabel = {
+  travel: "Travel Nurse",
+  stationary: "Stationary Nurse",
+  specialized: "Specialized Nurse",
+  humanitarian: "Crisis / Humanitarian Nurse",
+};
+const labelToKey = {
+  "Travel Nurse": "travel",
+  "Stationary Nurse": "stationary",
+  "Specialized Nurse": "specialized",
+  "Crisis / Humanitarian Nurse": "humanitarian",
+};
+
 
 
 export const PreferencesSchema = Yup.object().shape({
@@ -324,14 +338,34 @@ const PreferencesFields = () => {
 
 const Preferences = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down("sm"));
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  useEffect(() => {
+    const fetch = async () => {
+      try {
+        const res = await getProfilePreferences();
+        const data = res?.data;
+        if (Array.isArray(data?.primaryCategories)) {
+          const mappedCategories = data.primaryCategories
+            .map((label) => labelToKey[label])
+            .filter(Boolean);
+          setFormInitialValues({
+            willingnessToRelocate: (data.relocationPreferences?.length || 0) > 0 ? "yes" : "no",
+            willingToTravel: (data.travelPreferences?.length || 0) > 0 ? "yes" : "no",
+            travelPreference: data.travelPreferences || [],
+            relocationStates: data.relocationPreferences || [],
+            internationalRelocation: (data.internationalRelocationPreferences?.length || 0) > 0 ? "yes" : "no",
+            preferredCountries: data.internationalRelocationPreferences || [],
+            primaryCategories: mappedCategories,
+            humanitarianRoles: data.crisisHumanitarianPreferences || [],
+          });
+        }
+      } catch (e) {
+      }
+    };
+    fetch();
+  }, []);
 
 const handleSubmit = async (values) => {
-  const categoryLabelMap = {
-    travel: "Travel Nurse",
-    stationary: "Stationary Nurse",
-    specialized: "Specialized Nurse",
-    humanitarian: "Crisis / Humanitarian Nurse",
-  };
 
   const payload = {
     willingnessToRelocate: values.willingnessToRelocate === "yes",
@@ -354,10 +388,7 @@ const handleSubmit = async (values) => {
         ? values.preferredCountries
         : [],
 
-    // 🔥 FIX THAT WAS MISSING
-    primaryCategories: values.primaryCategories.map(
-      (key) => categoryLabelMap[key]
-    ),
+    primaryCategories: values.primaryCategories.map((key) => keyToLabel[key]),
 
     humanitarianRoles: values.humanitarianRoles,
   };
@@ -385,7 +416,8 @@ const handleSubmit = async (values) => {
 
   return (
    <Formik
-  initialValues={initialValues}
+  enableReinitialize
+  initialValues={formInitialValues}
   validationSchema={PreferencesSchema}
   onSubmit={handleSubmit}
 >

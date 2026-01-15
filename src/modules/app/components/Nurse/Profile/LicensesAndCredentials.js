@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Box,
   Typography,
@@ -33,7 +33,7 @@ import * as Yup from 'yup';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
 import { postLicense } from 'src/modules/auth/api/authApi';
-
+import { getLicenses } from 'src/modules/auth/api/authApi';
 const nursingLicenseTypeOptions = [
   { label: 'Registered Nurse (RN)', value: 'RN' },
   { label: 'Licensed Practical Nurse (LPN)', value: 'LPN' },
@@ -202,9 +202,43 @@ const LicenseFormFields = () => {
 const LicensesAndCredentials = () => {
   const [open, setOpen] = useState(false);
   const [licenseList, setLicenseList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const theme = useTheme();
     const { isMobile, isTablet} = useResponsive();
   
+  useEffect(() => {
+    const fetchLicenses = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getLicenses();
+        const base = res && typeof res === 'object' ? res : {};
+        const list = Array.isArray(base?.data) ? base.data : Array.isArray(base) ? base : [];
+        const mapped = list.map((item) => {
+          const filename =
+            Array.isArray(item?.fileKey) && item.fileKey.length
+              ? String(item.fileKey[item.fileKey.length - 1]).split('/').pop()
+              : null;
+          return {
+            nursingLicenseType: item?.licenseType || '',
+            licenseState: Array.isArray(item?.states) ? item.states.join(', ') : item?.states || '',
+            licenseNumber: item?.licenseNumber || '',
+            expiryDate: item?.expiryDate ? new Date(item.expiryDate).toISOString().split('T')[0] : '',
+            multiStateLicense: item?.isMultiState ? 'Yes' : 'No',
+            specialtyCertifications: Array.isArray(item?.specialties) ? item.specialties : [],
+            credentialUploads: filename ? { name: filename } : null,
+          };
+        });
+        setLicenseList(mapped);
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load licenses');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLicenses();
+  }, []);
 
   const handleRemoveLicense = (indexToRemove) => {
     setLicenseList(licenseList.filter((_, index) => index !== indexToRemove));
@@ -230,6 +264,11 @@ const LicensesAndCredentials = () => {
         
       </Box>
 
+      {error && (
+        <Typography sx={{ color: theme.palette.error.main, mb: 2 }}>
+          {error}
+        </Typography>
+      )}
       <Box mt={4}>
         {licenseList.length === 0 ? (
           <Box textAlign="center" py={10}>

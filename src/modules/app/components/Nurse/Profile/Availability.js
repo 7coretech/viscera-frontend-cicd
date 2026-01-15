@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import { 
@@ -23,6 +23,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ButtonComponent from 'src/components/shared/Button';
 import { postAvailability } from 'src/modules/auth/api/authApi';
+import { getAvailability } from 'src/modules/auth/api/authApi';
 const hoursPerWeekOptions = [
   { label: 'Full-time (40+ hrs)', value: 'Full-time (40+ hrs)' },
   { label: 'Part-time (30-39 hrs)', value: 'Part-time (30-39 hrs)' },
@@ -214,6 +215,64 @@ const AvailabilityFields = () => {
 
 const Availability = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getAvailability();
+        const base = res && typeof res === 'object' ? res : {};
+        const data =
+          base && typeof base.data === 'object'
+            ? base.data
+            : base;
+        const toLabel = (code) => {
+          switch (code) {
+            case 'FULL_TIME':
+              return 'Full-time (40+ hrs)';
+            case 'PART_TIME_30_39':
+              return 'Part-time (30-39 hrs)';
+            case 'PART_TIME_20_30':
+              return 'Part-time (20-30 hrs)';
+            case 'LESS_THAN_20':
+              return 'Less than 20 hrs';
+            default:
+              return initialValues.hoursPerWeek;
+          }
+        };
+        const capDay = (d) =>
+          typeof d === 'string'
+            ? d.charAt(0).toUpperCase() + d.slice(1).toLowerCase()
+            : d;
+        setFormInitialValues({
+          availableFrom: data?.availableFrom
+            ? new Date(data.availableFrom).toISOString().split('T')[0]
+            : '',
+          hoursPerWeek: toLabel(data?.hoursPerWeek),
+          availableDays: Array.isArray(data?.availableDays)
+            ? data.availableDays.map(capDay)
+            : initialValues.availableDays,
+          immediateJoining: '',
+          preferredStartTime: '',
+          preferredEndTime: '',
+          overtimeAllowed: '',
+          willingToWorkOvertime: Boolean(data?.willingOvertime),
+          willingToWorkWeekends: Boolean(data?.willingWeekends),
+          willingToWorkNightShifts: Boolean(data?.willingNightShifts),
+          willingToBeOnCall: Boolean(data?.willingOnCall),
+        });
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load availability');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchAvailability();
+  }, []);
 
   
 
@@ -255,30 +314,34 @@ const handleSubmit = async (values, { setSubmitting, resetForm }) => {
 
   return (
     <Box sx={{  }}>
-        <Formik
-            initialValues={initialValues}
-            validationSchema={AvailabilitySchema}
-            onSubmit={handleSubmit}
-            enableReinitialize={true}
-        >
-            {({ isSubmitting, isValid, dirty }) => (
-                <Form>
-                    <AvailabilityFields />
-                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
-                        <ButtonComponent
-  type="submit"
-  variant="contained"
-  disabled={isSubmitting}
-  fullWidth={isMobileOrBelow}
-  sx={{ width: isMobileOrBelow ? '100%' : '200px' }}
->
-  Save Availability
-</ButtonComponent>
-
-                    </Box>
-                </Form>
+      <Formik
+        initialValues={formInitialValues}
+        validationSchema={AvailabilitySchema}
+        onSubmit={handleSubmit}
+        enableReinitialize={true}
+      >
+        {({ isSubmitting, isValid, dirty }) => (
+          <Form>
+            {error && (
+              <Typography sx={{ color: theme.palette.error.main, mb: 2 }}>
+                {error}
+              </Typography>
             )}
-        </Formik>
+            <AvailabilityFields />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
+              <ButtonComponent
+                type="submit"
+                variant="contained"
+                disabled={isSubmitting || loading}
+                fullWidth={isMobileOrBelow}
+                sx={{ width: isMobileOrBelow ? '100%' : '200px' }}
+              >
+                Save Availability
+              </ButtonComponent>
+            </Box>
+          </Form>
+        )}
+      </Formik>
     </Box>
   );
 };

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -32,6 +32,7 @@ import * as Yup from 'yup';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
 import { postExperience } from 'src/modules/auth/api/authApi';
+import { getExperiences } from 'src/modules/auth/api/authApi';
 
 
 const jobTypeOptions = [
@@ -279,6 +280,8 @@ const ExperienceFormFields = () => {
 const ExperienceAndWork = () => {
   const [open, setOpen] = useState(false);
   const [experienceList, setExperienceList] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const theme = useTheme();
   const { isMobile, isTablet } = useResponsive();
 
@@ -296,6 +299,35 @@ const ExperienceAndWork = () => {
     locationType: '',
     highAcuity: '',
   };
+
+  useEffect(() => {
+    const fetchExperiences = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const res = await getExperiences();
+        const list = Array.isArray(res?.data) ? res.data : [];
+        const mapped = list.map((item) => ({
+          startDate: item.startDate ? new Date(item.startDate).toISOString().split('T')[0] : '',
+          endDate: item.endDate ? new Date(item.endDate).toISOString().split('T')[0] : null,
+          totalYears: '',
+          specialtyYears: '',
+          lastPositionTitle: item.positionTitle || '',
+          lastEmployer: item.employer || '',
+          jobType: item.jobType || '',
+          shiftType: item.shiftType || '',
+          contractDuration: item.contractDurationWeeks != null ? String(item.contractDurationWeeks) : '',
+          locationType: item.location || '',
+          highAcuity: item.highAcuitySetting ? 'Yes' : 'No',
+        }));
+        setExperienceList(mapped);
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load experiences');
+      }
+      setLoading(false);
+    };
+    fetchExperiences();
+  }, []);
 
   return (
     <Box>
@@ -320,7 +352,19 @@ const ExperienceAndWork = () => {
       </Box>
 
       <Box mt={4}>
-        {experienceList.length === 0 ? (
+        {loading ? (
+          <Box textAlign="center" py={8}>
+            <Typography sx={{ ...theme.typography.h4, fontWeight: 500 }}>
+              Loading experiences...
+            </Typography>
+          </Box>
+        ) : error ? (
+          <Box textAlign="center" py={8}>
+            <Typography color="error" sx={{ ...theme.typography.h5 }}>
+              {error}
+            </Typography>
+          </Box>
+        ) : experienceList.length === 0 ? (
           <Box textAlign="center" py={10}>
             <DescriptionIcon
               sx={{ fontSize: 120, color: alpha(theme.palette.text.secondary, 0.4) }}

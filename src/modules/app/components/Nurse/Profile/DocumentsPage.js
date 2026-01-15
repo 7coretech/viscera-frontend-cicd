@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -24,7 +24,7 @@ import ButtonComponent from 'src/components/shared/Button';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
 import { postDocument } from 'src/modules/auth/api/authApi';
-
+import { getDocuments } from 'src/modules/auth/api/authApi';
 
 const AcceptedFileTypes = () => {
   const theme = useTheme();
@@ -57,9 +57,46 @@ const AcceptedFileTypes = () => {
 const DocumentsPage = () => {
   const [documentList, setDocumentList] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const theme = useTheme();
   const { isMobile, isTablet } = useResponsive();
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    const fetchDocuments = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getDocuments();
+        const base = res && typeof res === 'object' ? res : {};
+        const list = Array.isArray(base?.data) ? base.data : Array.isArray(base) ? base : [];
+        const mapped = list.map((item, idx) => {
+          const fileName = item?.originalFileName || '';
+          const ext =
+            fileName && fileName.includes('.')
+              ? fileName.split('.').pop().toLowerCase()
+              : (item?.mimeType || '').split('/').pop().toLowerCase();
+          const nameWithoutExt = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Document';
+          return {
+            id: item?.id || idx,
+            file: null,
+            fileName,
+            displayName: nameWithoutExt,
+            extension: ext || 'file',
+            categoryLabel: `Document ${idx + 1}`,
+            fileKey: item?.fileKey || '',
+          };
+        });
+        setDocumentList(mapped);
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load documents');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDocuments();
+  }, []);
 
   const getFileIcon = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase();
@@ -140,7 +177,7 @@ const DocumentsPage = () => {
         </FormHeaderContainer>
 
         {isMobile || isTablet ? (
-          <ButtonComponent variant="contained" onClick={handleUploadDocument}>
+          <ButtonComponent variant="contained" onClick={handleUploadDocument} disabled={loading}>
             <UploadFileIcon />
           </ButtonComponent>
         ) : (
@@ -149,11 +186,18 @@ const DocumentsPage = () => {
             startIcon={<UploadFileIcon />}
             onClick={handleUploadDocument}
             sx={{ minWidth: '150px' }}
+            disabled={loading}
           >
             Upload Document
           </ButtonComponent>
         )}
       </Box>
+
+      {error && (
+        <Typography sx={{ color: theme.palette.error.main, mt: 2 }}>
+          {error}
+        </Typography>
+      )}
 
       {documentList.length === 0 ? (
         <Box mt={4} textAlign="center" py={10}>

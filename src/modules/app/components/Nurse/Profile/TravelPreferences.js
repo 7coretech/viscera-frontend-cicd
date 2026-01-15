@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -21,7 +21,7 @@ import theme from 'src/config/theme';
 import ButtonComponent from 'src/components/shared/Button';
 
 import { postTravelPreference } from 'src/modules/auth/api/authApi';
-
+import { getTravelPreference } from 'src/modules/auth/api/authApi';
 const initialValues = {
   isWillingToTravel: false,
   travelTimePercentage: 25,
@@ -241,6 +241,40 @@ const TravelFields = () => {
 
 const TravelPreferences = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchTravel = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getTravelPreference();
+        const base = res && typeof res === 'object' ? res : {};
+        const data =
+          base && typeof base.data === 'object'
+            ? base.data
+            : base;
+        setFormInitialValues({
+          isWillingToTravel: Boolean(data?.willingToTravel),
+          travelTimePercentage: 25,
+          maxTravelDistance: 50,
+          preferredStates: Array.isArray(data?.preferredStatesOrRegions) ? data.preferredStatesOrRegions.join(', ') : '',
+          hasDriversLicense: Boolean(data?.additionalInformation?.hasDriversLicense),
+          hasOwnVehicle: Boolean(data?.additionalInformation?.hasOwnVehicle),
+          hasValidPassport: Boolean(data?.additionalInformation?.hasPassport),
+          willingForInternationalDeployment: Boolean(data?.additionalInformation?.openToInternationalAssignments),
+          preferredWorkStyle: Array.isArray(data?.preferredWorkStyle) ? data.preferredWorkStyle : [],
+        });
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load travel preferences');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTravel();
+  }, []);
 
   const handleSubmit = async (values, { setSubmitting }) => {
     try {
@@ -270,18 +304,24 @@ const TravelPreferences = () => {
   return (
     <Box>
       <Formik
-        initialValues={initialValues}
+        initialValues={formInitialValues}
         validationSchema={TravelPreferencesSchema}
         onSubmit={handleSubmit}
         enableReinitialize={true}
       >
         {() => (
           <Form>
+            {error && (
+              <Typography sx={{ color: theme.palette.error.main, mb: 2 }}>
+                {error}
+              </Typography>
+            )}
             <TravelFields />
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
               <ButtonComponent
                 type="submit"
                 variant="contained"
+                disabled={loading}
                 fullWidth={isMobileOrBelow}
                 sx={{ width: isMobileOrBelow ? '100%' : 200 }}
               >

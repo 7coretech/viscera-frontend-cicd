@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -28,14 +28,50 @@ import ButtonComponent from 'src/components/shared/Button';
 import { useTheme } from '@mui/material';
 import useResponsive from 'src/components/hooks/useResponsive';
 import { postResume } from 'src/modules/auth/api/authApi';
-
+import { getResumes } from 'src/modules/auth/api/authApi';
 const ResumeManager = () => {
   const [resumeList, setResumeList] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const theme = useTheme();
   const fileInputRef = useRef(null);
   const { isMobile, isTablet } = useResponsive();
 
+  useEffect(() => {
+    const fetchResumes = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getResumes();
+        const base = res && typeof res === 'object' ? res : {};
+        const list = Array.isArray(base?.data) ? base.data : Array.isArray(base) ? base : [];
+        const mapped = list.map((item, idx) => {
+          const fileName = item?.originalFileName || '';
+          const ext =
+            fileName && fileName.includes('.')
+              ? fileName.split('.').pop().toLowerCase()
+              : (item?.mimeType || '').split('/').pop().toLowerCase();
+          const nameWithoutExt = fileName ? fileName.replace(/\.[^/.]+$/, '') : 'Resume';
+          return {
+            id: item?.id || idx,
+            fileName,
+            displayName: nameWithoutExt,
+            extension: ext || 'pdf',
+            isPrimary: Boolean(item?.isPrimary),
+            categoryLabel: `Resume ${idx + 1}`,
+            fileKey: item?.fileKey || '',
+          };
+        });
+        setResumeList(mapped);
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load resumes');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchResumes();
+  }, []);
   const getFileIcon = (fileName) => {
     const ext = fileName.split('.').pop().toLowerCase();
     if (ext === 'pdf') return <PictureAsPdfIcon sx={{ color: '#f44336' }} />;
@@ -144,7 +180,7 @@ const ResumeManager = () => {
         </FormHeaderContainer>
 
         {isMobile || isTablet ? (
-          <ButtonComponent variant="contained" onClick={handleUploadResumeClick}>
+          <ButtonComponent variant="contained" onClick={handleUploadResumeClick} disabled={loading}>
             <UploadFileIcon />
           </ButtonComponent>
         ) : (
@@ -153,12 +189,18 @@ const ResumeManager = () => {
             startIcon={<UploadFileIcon />}
             onClick={handleUploadResumeClick}
             sx={{ minWidth: '150px' }}
+            disabled={loading}
           >
             Upload Resume
           </ButtonComponent>
         )}
       </Box>
 
+      {error && (
+        <Typography sx={{ color: theme.palette.error.main, mt: 2 }}>
+          {error}
+        </Typography>
+      )}
       {resumeList.length === 0 ? (
         <Box mt={4} textAlign="center" py={10}>
           <DescriptionIcon

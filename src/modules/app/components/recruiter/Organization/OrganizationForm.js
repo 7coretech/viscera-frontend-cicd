@@ -49,7 +49,23 @@ const [loadingOrg, setLoadingOrg] = useState(true);
 const fetchOrganization = async () => {
   try {
     setLoadingOrg(true);
+const FORM_STORAGE_KEY = 'nurse_personal_details_form';
 
+const initialValues = {
+  fullName: '',
+  emailId: '',
+  mobileNumber: '',
+  dateOfBirth: null,
+  gender: '',
+  workStatus: '',
+  address: '',
+  city: '',
+  state: '',
+  zipCode: '',
+  professionalBio: '',
+  photo: null,
+  languages: [],
+};
     const res = await getRecruiterOrganization();
     const org = res?.data?.data;
     const location = org?.location?.[0];

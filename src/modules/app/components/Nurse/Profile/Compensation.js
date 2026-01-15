@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Formik, Form, useFormikContext } from 'formik';
 import * as Yup from 'yup';
 import { 
@@ -23,7 +23,7 @@ import theme from 'src/config/theme';
 import ButtonComponent from 'src/components/shared/Button';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import { postCompensation } from 'src/modules/auth/api/authApi';
-
+import { getCompensation } from 'src/modules/auth/api/authApi';
 
 const salaryTypeOptions = [
   { label: 'Annual Salary', value: 'Annual Salary' },
@@ -310,6 +310,44 @@ const CompensationFields = () => {
 
 const Compensation = () => {
   const isMobileOrBelow = useMediaQuery(theme.breakpoints.down('sm'));
+  const [formInitialValues, setFormInitialValues] = useState(initialValues);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchCompensation = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const res = await getCompensation();
+        const base = res && typeof res === 'object' ? res : {};
+        const data =
+          base && typeof base.data === 'object'
+            ? base.data
+            : base;
+        const yesNo = (b) => (b ? 'Yes' : 'No');
+        setFormInitialValues({
+          salaryType: data?.salaryType || initialValues.salaryType,
+          minimumSalary: data?.salaryRange?.minimum ?? '',
+          maximumSalary: data?.salaryRange?.maximum ?? '',
+          salaryNegotiable: Boolean(data?.salaryRange?.isNegotiable),
+          expectedHourlyRate: data?.additionalCompensation?.expectedHourlyRate ?? '',
+          expectedWeeklyPay: data?.additionalCompensation?.expectedWeeklyPay ?? '',
+          expectedTravelPackage: data?.additionalCompensation?.expectedTravelPackage ?? '',
+          housingNeeded: yesNo(Boolean(data?.requirements?.accommodationNeeded)),
+          stipendRequired: yesNo(Boolean(data?.requirements?.stipendRequired)),
+          visaAssistanceRequired: yesNo(Boolean(data?.requirements?.visaAssistanceRequired)),
+          sponsorshipRequired: yesNo(Boolean(data?.requirements?.sponsorshipRequired)),
+          selectedBenefits: Array.isArray(data?.preferredBenefits) ? data.preferredBenefits : [],
+        });
+      } catch (e) {
+        setError(e?.response?.data?.message || 'Failed to load compensation');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchCompensation();
+  }, []);
 
   const handleSubmit = async (values, { setSubmitting, resetForm }) => {
   try {
@@ -353,18 +391,24 @@ const Compensation = () => {
   return (
     <Box>
         <Formik
-            initialValues={initialValues}
+            initialValues={formInitialValues}
             validationSchema={CompensationSchema}
             onSubmit={handleSubmit}
             enableReinitialize={true}
         >
             {({ isSubmitting, isValid, dirty }) => (
                 <Form>
+                    {error && (
+                      <Typography sx={{ color: theme.palette.error.main, mb: 2 }}>
+                        {error}
+                      </Typography>
+                    )}
                     <CompensationFields />
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 4 }}>
                         <ButtonComponent
                             type="submit"
                             variant="contained"
+                            disabled={isSubmitting || loading}
                             fullWidth={isMobileOrBelow}
                             sx={{ width: '200px' }}
                         >
